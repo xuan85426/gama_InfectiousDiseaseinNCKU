@@ -15,20 +15,27 @@ global {
 	int staying_time <- 60;
 	file roads_shapefile <- file("../includes/ncku_road.shp");
 	file buildings_shapefile <- file("../includes/ncku_building.shp");
+	file people_in_building <- csv_file("../includes/PeopleinBuilding.csv");
 	geometry shape <- envelope(roads_shapefile);
 	graph road_network;
 	int nb_people_infected <- nb_infected_init update: people count (each.is_infected);
 	int nb_people_not_infected <- nb_people - nb_infected_init update: nb_people - nb_people_infected;
 	float infected_rate update: nb_people_infected/length(people);
 	
+	
+	
 	init {
 		create road from: roads_shapefile;
 		road_network <- as_edge_graph(road);
 		create building from: buildings_shapefile;
-		create people number:nb_people {
-			speed <- 5.0 #km/#h;
-			location <- any_location_in(one_of(building));
-			target <- any_location_in(one_of(building));
+		// create people in building
+		matrix data <- matrix(people_in_building);
+		loop i from: 0 to: data.rows - 1{
+			create people number: int(data[i]){
+				speed <- 5.0 #km/#h;
+				location <- any_location_in(building[i]);
+				target <- any_location_in(one_of(building));
+			}
 		}
 		ask nb_infected_init among people {
 			is_infected <- true;
@@ -43,16 +50,40 @@ species people skills:[moving]{
 	bool is_infected <- false;
 	point target;
 	int staying_counter;
+	bool is_dead <- false;
+	int daying_clock <- 0;
 	
 	reflex move when: target != nil{
 		do goto target: target on: road_network;
 		if (location = target) {
 			target <- nil;
 		} 
+		if(is_dead){
+			target <- nil;
+		}
+	}
+	
+	reflex counter when: is_infected{
+		if(daying_clock < 3000 and !is_dead){
+			daying_clock <- daying_clock + 1;			
+		}
+		if(daying_clock >= 3000){
+			is_dead <- true;
+		}
 	}
 	
 	aspect default{
-		draw circle(10) color:is_infected ? #red : #green;
+//		draw circle(10) color:is_dead? #black :(is_infected ? #red : #green);
+		if(is_dead){
+			draw circle(10) color: #black;
+		}
+		else if(is_infected){
+			draw circle(10) color: #red;
+		}
+		else{
+			draw circle(10) color: #green;
+		}
+
 	}
 }
 

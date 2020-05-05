@@ -10,8 +10,14 @@
 model InfectiousDiseaseModel
 
 global {
+	float step <- 1 #minutes;
+	int current_day update: current_date.day;
+	int current_hour update: current_date.hour;
+	
+	float base_infect_rate <- 0.1;
+	
 	int nb_people <- 500;
-	int nb_infected_init <- 5;
+	int nb_infected_init <- 10;
 	int staying_time <- 60;
 	file roads_shapefile <- file("../includes/ncku_road.shp");
 	file buildings_shapefile <- file("../includes/ncku_building.shp");
@@ -21,7 +27,6 @@ global {
 	int nb_people_infected <- nb_infected_init update: people count (each.is_infected);
 	int nb_people_not_infected <- nb_people - nb_infected_init update: nb_people - nb_people_infected;
 	float infected_rate update: nb_people_infected/length(people);
-	
 	
 	
 	init {
@@ -37,6 +42,7 @@ global {
 				target <- any_location_in(one_of(building));
 			}
 		}
+
 		ask nb_infected_init among people {
 			is_infected <- true;
 		}
@@ -50,34 +56,17 @@ species people skills:[moving]{
 	bool is_infected <- false;
 	point target;
 	int staying_counter;
-	bool is_dead <- false;
-	int daying_clock <- 0;
 	
 	reflex move when: target != nil{
 		do goto target: target on: road_network;
 		if (location = target) {
 			target <- nil;
-		} 
-		if(is_dead){
-			target <- nil;
 		}
 	}
 	
-	reflex counter when: is_infected{
-		if(daying_clock < 3000 and !is_dead){
-			daying_clock <- daying_clock + 1;			
-		}
-		if(daying_clock >= 3000){
-			is_dead <- true;
-		}
-	}
 	
 	aspect default{
-//		draw circle(10) color:is_dead? #black :(is_infected ? #red : #green);
-		if(is_dead){
-			draw circle(10) color: #black;
-		}
-		else if(is_infected){
+		if(is_infected){
 			draw circle(10) color: #red;
 		}
 		else{
@@ -97,29 +86,31 @@ species road {
 species building {
 	float height <- 10#m + rnd(10) #m;
 	int nb_infected_in_building <- 0;
-	int nb_people_in_building <- 0;
+	float my_infect_rate <- 0.0 update: float(nb_infected_in_building) * base_infect_rate;
+	bool new_infected_member <- false;
 	aspect default {
 		draw shape color:nb_infected_in_building = 0 ? #gray : #red depth: height;
 	}
+	
 	reflex let_people_enter {
 		ask (people inside self where ((each.target = nil) and (each.staying_counter = 0))){
-			myself.nb_people_in_building <- myself.nb_people_in_building + 1;
 			if(is_infected){
-				if(myself.nb_infected_in_building = 0){
-					ask (people inside myself where (each.is_infected = false)){
-						is_infected <- true;						
-					}
-					myself.nb_infected_in_building <- myself.nb_people_in_building;
-				}else{
-					myself.nb_infected_in_building <- myself.nb_infected_in_building + 1;
-				}
-			}else{
-				if(myself.nb_infected_in_building != 0){
-					is_infected <- true;
-					myself.nb_infected_in_building <- myself.nb_infected_in_building + 1;
-				}
+				myself.nb_infected_in_building <- myself.nb_infected_in_building + 1;
+				myself.new_infected_member <- true;
 			}
-		}
+		}		
+	}
+	
+	reflex infect_someone when: new_infected_member{
+		new_infected_member <- false;
+		ask(people inside self where(each.is_infected = false)){
+			write(myself.my_infect_rate);
+			if(flip(myself.my_infect_rate)){
+				write("got infected!!!");
+				is_infected <- true;
+				myself.nb_infected_in_building <- myself.nb_infected_in_building + 1;
+			}
+		}	
 	}
 	reflex let_people_leave {
 		ask (people inside self where (each.target = nil)){
@@ -130,7 +121,6 @@ species building {
 				}
 				staying_counter <- 0;
 				target <- any_location_in(one_of(building));
-				myself.nb_people_in_building <- myself.nb_people_in_building - 1;
 			}
 		}
 	}
@@ -142,6 +132,8 @@ experiment main_experiment type:gui{
 	parameter "Staying time" var: staying_time;
 	output {
 		monitor "Infected people rate" value: infected_rate;
+		monitor "Current day" value: current_day;
+		monitor "Current hour" value: current_hour;		
 		display map_3D type: opengl {
 			species road ;
 			species people;			

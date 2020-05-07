@@ -14,7 +14,7 @@ global {
 	int current_day update: current_date.day;
 	int current_hour update: current_date.hour;
 	
-	float base_infect_rate <- 0.1;
+	float base_infect_rate <- 0.001;
 	
 	int nb_people <- 500;
 	int nb_infected_init <- 10;
@@ -54,6 +54,7 @@ global {
 
 species people skills:[moving]{
 	bool is_infected <- false;
+	bool gone_to_graduation <- false;
 	point target;
 	int staying_counter;
 	
@@ -63,7 +64,6 @@ species people skills:[moving]{
 			target <- nil;
 		}
 	}
-	
 	
 	aspect default{
 		if(is_infected){
@@ -120,7 +120,12 @@ species building {
 					myself.nb_infected_in_building <- myself.nb_infected_in_building - 1;
 				}
 				staying_counter <- 0;
-				target <- any_location_in(one_of(building));
+				if(current_day = 1 and current_hour >=10 and current_hour <= 12 and gone_to_graduation = false){
+					target <- any_location_in(building[30]);
+					gone_to_graduation <- true;
+				}else{
+					target <- any_location_in(one_of(building));
+				}
 			}
 		}
 	}

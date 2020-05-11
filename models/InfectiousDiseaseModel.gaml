@@ -28,6 +28,9 @@ global {
 	int nb_people_not_infected <- nb_people - nb_infected_init update: nb_people - nb_people_infected;
 	float infected_rate update: nb_people_infected/length(people);
 	
+//	float infected_distance <- 5 #m;
+//	float infect_prop <- 0.3;
+	
 	
 	init {
 		create road from: roads_shapefile;
@@ -55,6 +58,7 @@ global {
 species people skills:[moving]{
 	bool is_infected <- false;
 	bool gone_to_graduation <- false;
+//	bool in_building <- false;
 	point target;
 	int staying_counter;
 	
@@ -62,8 +66,17 @@ species people skills:[moving]{
 		do goto target: target on: road_network;
 		if (location = target) {
 			target <- nil;
+//			in_building <- true;
 		}
 	}
+	
+//	reflex infect_nearby when: in_building{
+//		ask people at_distance infected_distance{
+//			if(flip(infect_prop)){
+//				is_infected <- true;
+//			}
+//		}
+//	}
 	
 	aspect default{
 		if(is_infected){
@@ -140,9 +153,9 @@ experiment main_experiment type:gui{
 		monitor "Current day" value: current_day;
 		monitor "Current hour" value: current_hour;		
 		display map_3D type: opengl {
-			species road ;
+			species road;
 			species people;			
-			species building  transparency: 0.5;
+			species building transparency: 0.5;
 		}
 		display chart refresh: every(10#cycles) {
 			chart "Disease spreading" type: series style: spline {
